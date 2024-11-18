@@ -37,9 +37,9 @@ class RecursiveNeuralNetworkFromScratch:
 		return dict(distribution = torch.stack(P), latent = torch.stack(H))
 
 
-	def fit(self, train_ds, epochs=-1, callbacks=[]):
+	def fit(self, data_generator, epochs=-1, callbacks=[]):
 		while (epochs := epochs - 1) + 1:
-			inputs, targets = next(train_ds) # input_length x tokens
+			inputs, targets = data_generator() # input_length x tokens
 			P, H = self.forward(inputs).values()
 
 			loss = -torch.sum(P * torch.log(torch.sum(P * targets, dim=1))[:, None])
