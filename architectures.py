@@ -42,7 +42,8 @@ class RecursiveNeuralNetworkFromScratch:
 			inputs, targets = data_generator() # input_length x tokens
 			P, H = self.forward(inputs).values()
 
-			loss = -torch.sum(P * torch.log(torch.sum(P * targets, dim=1))[:, None])
+			# loss = -torch.sum(P * torch.log(torch.sum(P * targets, dim=1))[:, None])
+			loss = -torch.sum(torch.sum(P, dim=1) * torch.log(torch.sum(P * targets, dim=1)))
 			loss.backward()
 
 			for callback in callbacks:

@@ -1,6 +1,7 @@
 import torch
 from typing import Callable, Iterable
 from automatons import Automaton
+from lightning.pytorch import seed_everything
 
 def make_tokenizer(mapdict):
 	tokenizer = {'A': 0, 'B': 1, '#': 2}
