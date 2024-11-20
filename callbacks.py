@@ -2,15 +2,20 @@ from dataclasses import dataclass
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
+from typing import Callable
+import torch
 import numpy as np
+from abc import ABC, abstractmethod
 from automatons import Automaton
+from models import Model
 
-class Callback:
-	def __call__(self, **kwargs):
-		...
+class Callback(ABC):
+    @abstractmethod
+    def __call__(self, **kwargs):
+        ...
 
 @dataclass
-class Projection:
+class Projection(Callback):
 	automaton: Automaton
 	k_recent: int = 1000
 	automaton_states = []
@@ -50,3 +55,43 @@ class Projection:
 
 			legend1 = ax.legend(handles=scatter.legend_elements()[0], labels=range(len(self.automaton.transitions)+1), title="STATES")
 			plt.show()
+
+@dataclass
+class RecursiveNeuralNetworkFromScratchSampleOutput:
+	model: Model
+	pattern: list
+	eos: int
+	init: Callable
+
+	def __call__(self, epoch, **kwargs):
+		Wxh, Whh, Why, bh, by = self.model.weights.values()
+		x = self.init()
+		ixes = []
+		h = torch.zeros([self.model.hidden_size,])
+
+		while True:
+			h = torch.tanh(Wxh @ x +  Whh @ h + bh)
+			p = torch.nn.functional.softmax(Why @ h + by, dim=0)
+			ix = np.random.choice(range(self.eos+1), p=p.detach().numpy().ravel())
+			x = torch.zeros((self.eos+1,))
+			x[ix] = 1
+			ixes.append(ix)
+			if ix == self.eos:
+				break
+		print(f"{epoch: <16} {ixes[-len(self.pattern)-1:]}{ixes}")
+
+@dataclass
+class LogLoss:
+	frequency: int = 1
+	def __call__(self, loss, epoch, **kwargs):
+		if not epoch % self.frequency:
+			print(f"{epoch: <16}\t{loss}")
+
+@dataclass
+class LogAccuracy:
+	frequency: int = 1
+	def __call__(self, logits, targets, epoch, **kwargs):
+		if not epoch % self.frequency:
+			correct = (logits.argmax(dim=1) == targets.argmax(dim=1)).sum()
+			accuracy = correct / len(targets)
+			print(f"{epoch: <16}accuracy:\t{accuracy}")

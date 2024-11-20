@@ -9,7 +9,7 @@ def make_tokenizer(mapdict):
 	return tokenizer
 
 def onehot(sequence: Iterable, tokens: int):
-	return torch.nn.functional.one_hot(torch.tensor(sequence), num_classes=tokens).float()
+	return torch.nn.functional.one_hot(torch.tensor(sequence).long(), num_classes=tokens).float()
 
 def data_loader(automaton: Automaton):
 	while True:
