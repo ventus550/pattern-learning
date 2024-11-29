@@ -11,6 +11,8 @@ from keras.layers import (
     MaxPooling1D,
     Conv1D,
     Dropout,
+    Bidirectional,
+    Attention,
 )
 
 os.environ["KERAS_BACKEND"] = "torch"
@@ -146,6 +148,30 @@ class BinaryConvolutionalClassifier(KerasModel):
         x = Conv1D(filters=size[2], kernel_size=3, activation="relu")(x)
         x = Flatten()(x)
         x = Dense(size[3], activation="relu")(x)
+        x = Dense(1, activation="sigmoid")(x)
+        super().__init__(inputs=inputs, outputs=x)
+
+    def compute_loss(self, outputs, targets):
+        return torch.nn.functional.binary_cross_entropy(
+            outputs, targets[:, None].float().cuda()
+        )
+
+
+class BinaryAttentionClassifier(KerasModel):
+    def __init__(self, input_length, model_scale=1.0):
+        size = (numpy.array([256, 128, 64]) * model_scale).round().astype(int)
+
+        inputs = keras.Input(shape=(input_length,))
+        x = Embedding(input_dim=2, output_dim=8)(inputs)
+        x = Bidirectional(LSTM(int(size[0]), return_sequences=True), merge_mode="sum")(
+            x
+        )  # Keep sequences for attention
+        attention = Attention()([x, x])  # Apply attention to the LSTM outputs
+        x = keras.ops.sum(
+            attention, axis=1
+        )  # Flatten attention output for the dense layers
+        x = Dense(size[1], activation="relu")(x)
+        x = Dense(size[2], activation="sigmoid")(x)
         x = Dense(1, activation="sigmoid")(x)
         super().__init__(inputs=inputs, outputs=x)
 
