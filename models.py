@@ -119,11 +119,11 @@ class KerasModel(keras.Model):
 
 
 class BinaryLSTMClassifier(KerasModel):
-    def __init__(self, input_length, model_scale=1.0):
-        size = (numpy.array([256, 128, 64]) * model_scale).round().astype(int)
+    def __init__(self, input_length, tokens=2, model_scale=1.0):
+        size = (numpy.array([180, 90, 45]) * model_scale).round().astype(int)
 
         inputs = keras.Input(shape=(input_length,))
-        x = Embedding(input_dim=2, output_dim=8)(inputs)
+        x = Embedding(input_dim=tokens, output_dim=8)(inputs)
         x = LSTM(int(size[0]), return_sequences=False)(x)
         x = Flatten()(x)
         x = Dense(size[1], activation="relu")(x)
@@ -138,11 +138,11 @@ class BinaryLSTMClassifier(KerasModel):
 
 
 class BinaryConvolutionalClassifier(KerasModel):
-    def __init__(self, input_length, model_scale=1):
+    def __init__(self, input_length, tokens=2, model_scale=1):
         size = (numpy.array([16, 32, 64, 128]) * model_scale).round().astype(int)
 
         inputs = keras.Input(shape=(input_length,))
-        x = Embedding(input_dim=2, output_dim=8)(inputs)
+        x = Embedding(input_dim=tokens, output_dim=8)(inputs)
         x = Conv1D(filters=size[0], kernel_size=3, activation="relu")(x)
         x = Conv1D(filters=size[1], kernel_size=3, activation="relu")(x)
         x = Conv1D(filters=size[2], kernel_size=3, activation="relu")(x)
@@ -158,11 +158,11 @@ class BinaryConvolutionalClassifier(KerasModel):
 
 
 class BinaryAttentionClassifier(KerasModel):
-    def __init__(self, input_length, model_scale=1.0):
-        size = (numpy.array([256, 128, 64]) * model_scale).round().astype(int)
+    def __init__(self, input_length, tokens=2, model_scale=1.0):
+        size = (numpy.array([128, 64, 32]) * model_scale).round().astype(int)
 
         inputs = keras.Input(shape=(input_length,))
-        x = Embedding(input_dim=2, output_dim=8)(inputs)
+        x = Embedding(input_dim=tokens, output_dim=8)(inputs)
         x = Bidirectional(LSTM(int(size[0]), return_sequences=True), merge_mode="sum")(
             x
         )  # Keep sequences for attention
