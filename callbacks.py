@@ -111,9 +111,9 @@ class LogLoss(Callback):
 class LogAccuracy(Callback):
     frequency: int = 1
 
-    def __call__(self, logits, targets, epoch, **kwargs):
+    def __call__(self, outputs, targets, epoch, **kwargs):
         if not epoch % self.frequency:
-            correct = (logits.argmax(dim=1) == targets.argmax(dim=1)).sum()
+            correct = (outputs.argmax(dim=1) == targets.argmax(dim=1)).sum()
             accuracy = correct / len(targets)
             print(f"{epoch: <16}accuracy:\t{accuracy}")
 
@@ -122,10 +122,10 @@ class LogAccuracy(Callback):
 class LogBinaryAccuracy(Callback):
     frequency: int = 1
 
-    def __call__(self, logits, targets, epoch, **kwargs):
+    def __call__(self, outputs, targets, epoch, **kwargs):
         if not epoch % self.frequency:
             print(
-                f"{epoch: <16}accuracy:\t{binary_accuracy(targets, logits).mean().item()}"
+                f"{epoch: <16}accuracy:\t{binary_accuracy(targets, outputs).mean().item()}"
             )
 
 
@@ -140,7 +140,7 @@ class LogBinaryDiscoveryData(Callback):
         color = "\033[33m" #"\033[31m"
         bold = "\033[1m"
 
-    def __call__(self, logits, inputs, targets, epoch, **kwargs):
+    def __call__(self, outputs, inputs, targets, epoch, **kwargs):
         if not epoch % self.frequency:
             inputs = inputs.cpu().numpy()
 
@@ -156,7 +156,7 @@ class LogBinaryDiscoveryData(Callback):
             explainer = shap.Explainer(self.model, inputs)
             shap_values = explainer.shap_values(positive_sample[None, :])[0]
             top_k_indices = np.argsort(shap_values)[-self.topk :]
-            text = f"{epoch: <16}accuracy:\t{binary_accuracy(targets, logits).mean().item(): <16} \t\t"
+            text = f"{epoch: <16}accuracy:\t{binary_accuracy(targets, outputs).mean().item(): <16} \t\t"
 
             for i, item in enumerate(positive_sample):
                 if i in top_k_indices:

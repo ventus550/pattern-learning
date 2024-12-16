@@ -7,13 +7,12 @@ from keras.layers import (
     LSTM,
     Flatten,
     Dense,
-    BatchNormalization,
-    MaxPooling1D,
     Conv1D,
-    Dropout,
     Bidirectional,
     Attention,
+    Add,
 )
+from keras import ops
 
 os.environ["KERAS_BACKEND"] = "torch"
 # torch.set_default_device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -113,9 +112,53 @@ class KerasModel(keras.Model):
                     loss=loss,
                     inputs=inputs,
                     targets=targets,
-                    logits=outputs,
+                    outputs=outputs,
                     epoch=epochs,
                 )
+
+
+class SinePositionEncoding(keras.layers.Layer):
+    def __init__(
+        self,
+        max_wavelength=10000,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.max_wavelength = max_wavelength
+        self.built = True
+
+    def call(self, inputs, start_index=0):
+        shape = ops.shape(inputs)
+        seq_length = shape[-2]
+        hidden_size = shape[-1]
+        positions = ops.arange(seq_length)
+        positions = ops.cast(positions + start_index, self.compute_dtype)
+        min_freq = ops.cast(1 / self.max_wavelength, dtype=self.compute_dtype)
+        timescales = ops.power(
+            min_freq,
+            ops.cast(2 * (ops.arange(hidden_size) // 2), self.compute_dtype)
+            / ops.cast(hidden_size, self.compute_dtype),
+        )
+        angles = ops.expand_dims(positions, 1) * ops.expand_dims(timescales, 0)
+        # even indices are sine, odd are cosine
+        cos_mask = ops.cast(ops.arange(hidden_size) % 2, self.compute_dtype)
+        sin_mask = 1 - cos_mask
+        # embedding shape is [seq_length, hidden_size]
+        positional_encodings = ops.sin(angles) * sin_mask + ops.cos(angles) * cos_mask
+
+        return ops.broadcast_to(positional_encodings, shape)
+
+    def get_config(self):
+        config = super().get_config()
+        config.update(
+            {
+                "max_wavelength": self.max_wavelength,
+            }
+        )
+        return config
+
+    def compute_output_shape(self, input_shape):
+        return input_shape
 
 
 class BinaryLSTMClassifier(KerasModel):
@@ -157,7 +200,7 @@ class BinaryConvolutionalClassifier(KerasModel):
         )
 
 
-class BinaryAttentionClassifier(KerasModel):
+class BinaryLSTMAttentionClassifier(KerasModel):
     def __init__(self, input_length, tokens=2, model_scale=1.0):
         size = (numpy.array([128, 64, 32]) * model_scale).round().astype(int)
 
@@ -172,6 +215,34 @@ class BinaryAttentionClassifier(KerasModel):
         )  # Flatten attention output for the dense layers
         x = Dense(size[1], activation="relu")(x)
         x = Dense(size[2], activation="sigmoid")(x)
+        x = Dense(1, activation="sigmoid")(x)
+        super().__init__(inputs=inputs, outputs=x)
+
+    def compute_loss(self, outputs, targets):
+        return torch.nn.functional.binary_cross_entropy(
+            outputs, targets[:, None].float().cuda()
+        )
+
+
+class BinaryAttentionClassifier(KerasModel):
+    def __init__(
+        self, input_length, tokens=2, model_scale=1.0, position_encodings=True
+    ):
+        size = (numpy.array([256, 128, 64, 32]) * model_scale).round().astype(int)
+
+        inputs = keras.Input(shape=(input_length,))
+        embeddings = Embedding(input_dim=tokens, output_dim=8)(inputs)
+
+        if position_encodings:
+            position_encodings = SinePositionEncoding()(embeddings)
+            embeddings = Add()([embeddings, position_encodings])
+
+        attention_output = Attention()([embeddings, embeddings])
+        x = Flatten()(attention_output)
+        x = Dense(size[0], activation="relu")(x)
+        x = Dense(size[1], activation="relu")(x)
+        x = Dense(size[2], activation="relu")(x)
+        x = Dense(size[3], activation="relu")(x)
         x = Dense(1, activation="sigmoid")(x)
         super().__init__(inputs=inputs, outputs=x)
 
